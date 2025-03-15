@@ -18,6 +18,9 @@ THUMBNAILS="<table><tr>"
 count=0
 max_per_row=5
 
+# Track if any thumbnails were actually created/updated
+THUMBNAILS_UPDATED=false
+
 # Add each image to the grid using a table layout
 while IFS= read -r file; do
     # Create a thumbnail version if it doesn't exist
@@ -26,12 +29,13 @@ while IFS= read -r file; do
         echo "Creating thumbnail for $file"
         # Check if ImageMagick is available
         if command -v convert &> /dev/null; then
-            # Create thumbnail using ImageMagick (50% size)
+            # Create thumbnail using ImageMagick (10% size)
             convert "$file" -resize 10% "$thumb_file"
         else
             # If ImageMagick isn't available, just copy the original
             cp "$file" "$thumb_file"
         fi
+        THUMBNAILS_UPDATED=true
     fi
     
     # Start a new row after every 5 images
@@ -55,8 +59,13 @@ NEW_SECTION="$START_MARKER
 $THUMBNAILS
 $END_MARKER"
 
-# Update README.md using a temporary file approach
-if grep -q "$START_MARKER" README.md && grep -q "$END_MARKER" README.md; then
+# Update README.md if needed
+README_UPDATED=false
+if [ ! -f "README.md" ]; then
+    echo "Creating new README.md"
+    echo -e "# Wallpaper Collection\n\n$NEW_SECTION" > README.md
+    README_UPDATED=true
+elif grep -q "$START_MARKER" README.md && grep -q "$END_MARKER" README.md; then
     # Create a temporary file
     TEMP_FILE=$(mktemp)
     
@@ -69,27 +78,35 @@ if grep -q "$START_MARKER" README.md && grep -q "$END_MARKER" README.md; then
     # Extract the part after END_MARKER
     sed -n "/$END_MARKER/,\$p" README.md | sed '1d' >> "$TEMP_FILE"
     
-    # Replace the original file
-    mv "$TEMP_FILE" README.md
+    # Check if there's a difference before replacing
+    if ! cmp -s "$TEMP_FILE" README.md; then
+        echo "Updating existing README.md"
+        mv "$TEMP_FILE" README.md
+        README_UPDATED=true
+    else
+        echo "No changes needed to README.md"
+        rm "$TEMP_FILE"
+    fi
 else
     # If the markers don't exist, append the new section to the README.
+    echo "Adding thumbnail section to existing README.md"
     echo -e "\n$NEW_SECTION" >> README.md
+    README_UPDATED=true
 fi
 
-# Add the thumbnails directory to git
-git add "$THUMB_DIR"
-
-# Configure Git.
+# Configure Git
 git config --global user.email "action@github.com"
 git config --global user.name "GitHub Action"
 
-# If README.md was modified, commit and push the changes.
+# Check if we have any changes to commit
+git add -A
 if [ -n "$(git status --porcelain)" ]; then
-    git add README.md
+    echo "Changes detected, committing..."
     git commit -m "Update image thumbnails in README [skip ci]"
     
     # Use the GITHUB_TOKEN for authentication
     git push "https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:${GITHUB_REF#refs/heads/}
+    echo "Changes pushed successfully"
 else
-    echo "No changes to README.md"
+    echo "No changes to commit"
 fi
