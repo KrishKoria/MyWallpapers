@@ -27,7 +27,7 @@ while IFS= read -r file; do
         # Check if ImageMagick is available
         if command -v convert &> /dev/null; then
             # Create thumbnail using ImageMagick (50% size)
-            convert "$file" -resize 50% "$thumb_file"
+            convert "$file" -resize 10% "$thumb_file"
         else
             # If ImageMagick isn't available, just copy the original
             cp "$file" "$thumb_file"
