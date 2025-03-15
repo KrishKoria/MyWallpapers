@@ -9,18 +9,27 @@ END_MARKER="<!-- END THUMBNAILS -->"
 # This command lists images, strips the leading "./", and sorts them.
 IMAGE_FILES=$(find . -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.bmp" \) -not -path "./.git/*" -exec realpath --relative-to=. {} \; | sort)
 
-# Start with a grid container div
-THUMBNAILS="<div style=\"display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;\">\n"
+# Initialize thumbnails HTML - using table-based layout which works better in GitHub
+THUMBNAILS="<table><tr>"
+count=0
+max_per_row=5
 
-# Add each image to the grid
+# Add each image to the grid using a table layout
 while IFS= read -r file; do
-    THUMBNAILS+="<div style=\"flex: 0 0 auto;\">"
-    THUMBNAILS+="<img src=\"$file\" width=\"150\" style=\"object-fit: cover; height: 150px;\" />"
-    THUMBNAILS+="</div>"$'\n'
+    # Start a new row after every 5 images
+    if [ $count -ne 0 ] && [ $(($count % $max_per_row)) -eq 0 ]; then
+        THUMBNAILS+="</tr><tr>"
+    fi
+    
+    THUMBNAILS+="<td align=\"center\">"
+    THUMBNAILS+="<img src=\"$file\" width=\"150\" height=\"150\" style=\"object-fit: cover;\"/>"
+    THUMBNAILS+="</td>"
+    
+    count=$((count + 1))
 done <<< "$IMAGE_FILES"
 
-# Close the grid container div
-THUMBNAILS+="</div>"
+# Complete any remaining row and close the table
+THUMBNAILS+="</tr></table>"
 
 # Create new content to insert between markers.
 NEW_SECTION="$START_MARKER
