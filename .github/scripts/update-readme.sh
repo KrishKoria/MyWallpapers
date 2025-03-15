@@ -9,12 +9,18 @@ END_MARKER="<!-- END THUMBNAILS -->"
 # This command lists images, strips the leading "./", and sorts them.
 IMAGE_FILES=$(find . -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.bmp" \) -not -path "./.git/*" -exec realpath --relative-to=. {} \; | sort)
 
-# Build the thumbnails markdown/HTML snippet.
-# Here we use HTML img tags with a fixed width for thumbnails.
-THUMBNAILS=""
+# Start with a grid container div
+THUMBNAILS="<div style=\"display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;\">\n"
+
+# Add each image to the grid
 while IFS= read -r file; do
-    THUMBNAILS+="<img src=\"$file\" width=\"150\" style=\"margin:5px;\" />"$'\n'
+    THUMBNAILS+="<div style=\"flex: 0 0 auto;\">"
+    THUMBNAILS+="<img src=\"$file\" width=\"150\" style=\"object-fit: cover; height: 150px;\" />"
+    THUMBNAILS+="</div>"$'\n'
 done <<< "$IMAGE_FILES"
+
+# Close the grid container div
+THUMBNAILS+="</div>"
 
 # Create new content to insert between markers.
 NEW_SECTION="$START_MARKER
