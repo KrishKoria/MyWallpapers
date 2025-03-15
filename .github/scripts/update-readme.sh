@@ -50,7 +50,9 @@ git config --global user.name "GitHub Action"
 if [ -n "$(git status --porcelain)" ]; then
     git add README.md
     git commit -m "Update image thumbnails in README [skip ci]"
-    git push
+    
+    # Use the GITHUB_TOKEN for authentication
+    git push "https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:${GITHUB_REF#refs/heads/}
 else
     echo "No changes to README.md"
 fi
