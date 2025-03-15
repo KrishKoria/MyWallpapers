@@ -5,9 +5,13 @@ set -e
 START_MARKER="<!-- START THUMBNAILS -->"
 END_MARKER="<!-- END THUMBNAILS -->"
 
+# Create thumbnails directory if it doesn't exist
+THUMB_DIR=".thumbnails"
+mkdir -p "$THUMB_DIR"
+
 # Find all image files (adjust extensions as needed)
 # This command lists images, strips the leading "./", and sorts them.
-IMAGE_FILES=$(find . -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.bmp" \) -not -path "./.git/*" -exec realpath --relative-to=. {} \; | sort)
+IMAGE_FILES=$(find . -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.bmp" \) -not -path "./.git/*" -not -path "./$THUMB_DIR/*" -exec realpath --relative-to=. {} \; | sort)
 
 # Initialize thumbnails HTML - using table-based layout which works better in GitHub
 THUMBNAILS="<table><tr>"
@@ -16,13 +20,28 @@ max_per_row=5
 
 # Add each image to the grid using a table layout
 while IFS= read -r file; do
+    # Create a thumbnail version if it doesn't exist
+    thumb_file="$THUMB_DIR/$(basename "$file")"
+    if [ ! -f "$thumb_file" ] || [ "$file" -nt "$thumb_file" ]; then
+        echo "Creating thumbnail for $file"
+        # Check if ImageMagick is available
+        if command -v convert &> /dev/null; then
+            # Create thumbnail using ImageMagick (50% size)
+            convert "$file" -resize 50% "$thumb_file"
+        else
+            # If ImageMagick isn't available, just copy the original
+            cp "$file" "$thumb_file"
+        fi
+    fi
+    
     # Start a new row after every 5 images
     if [ $count -ne 0 ] && [ $(($count % $max_per_row)) -eq 0 ]; then
         THUMBNAILS+="</tr><tr>"
     fi
     
     THUMBNAILS+="<td align=\"center\">"
-    THUMBNAILS+="<img src=\"$file\" width=\"150\" height=\"150\" style=\"object-fit: cover;\"/>"
+    # Use the thumbnail in the README but link to the original
+    THUMBNAILS+="<a href=\"$file\"><img src=\"$thumb_file\" width=\"150\" height=\"150\" style=\"object-fit: cover;\"/></a>"
     THUMBNAILS+="</td>"
     
     count=$((count + 1))
@@ -56,6 +75,9 @@ else
     # If the markers don't exist, append the new section to the README.
     echo -e "\n$NEW_SECTION" >> README.md
 fi
+
+# Add the thumbnails directory to git
+git add "$THUMB_DIR"
 
 # Configure Git.
 git config --global user.email "action@github.com"
