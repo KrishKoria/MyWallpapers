@@ -7,7 +7,7 @@ END_MARKER="<!-- END THUMBNAILS -->"
 
 # Find all image files (adjust extensions as needed)
 # This command lists images, strips the leading "./", and sorts them.
-IMAGE_FILES=$(find . -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.gif" \) -not -path "./.git/*" -exec realpath --relative-to=. {} \; | sort)
+IMAGE_FILES=$(find . -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.bmp" \) -not -path "./.git/*" -exec realpath --relative-to=. {} \; | sort)
 
 # Build the thumbnails markdown/HTML snippet.
 # Here we use HTML img tags with a fixed width for thumbnails.
@@ -21,15 +21,22 @@ NEW_SECTION="$START_MARKER
 $THUMBNAILS
 $END_MARKER"
 
-# Update README.md.
-# If the markers exist, replace the content between them.
+# Update README.md using a temporary file approach
 if grep -q "$START_MARKER" README.md && grep -q "$END_MARKER" README.md; then
-    # Using sed to replace from START_MARKER to END_MARKER.
-    # The command below works on Linux; on macOS you may need to adjust the sed -i flag.
-    sed -i.bak "/$START_MARKER/,/$END_MARKER/c\\
-$NEW_SECTION
-" README.md
-    rm README.md.bak
+    # Create a temporary file
+    TEMP_FILE=$(mktemp)
+    
+    # Extract the part before START_MARKER
+    sed -n "1,/$START_MARKER/p" README.md | sed '$d' > "$TEMP_FILE"
+    
+    # Append our new section
+    echo "$NEW_SECTION" >> "$TEMP_FILE"
+    
+    # Extract the part after END_MARKER
+    sed -n "/$END_MARKER/,\$p" README.md | sed '1d' >> "$TEMP_FILE"
+    
+    # Replace the original file
+    mv "$TEMP_FILE" README.md
 else
     # If the markers don't exist, append the new section to the README.
     echo -e "\n$NEW_SECTION" >> README.md
