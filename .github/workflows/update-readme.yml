@@ -21,10 +21,8 @@ jobs:
 
       - name: Rename files sequentially
         run: |
-          chmod +x .github/scripts/rename-files.sh
-          ./.github/scripts/rename-files.sh
+          bash .github/scripts/rename-files.sh
 
       - name: Run update script
         run: |
-          chmod +x .github/scripts/update-readme.sh
-          ./.github/scripts/update-readme.sh
+          bash .github/scripts/update-readme.sh
