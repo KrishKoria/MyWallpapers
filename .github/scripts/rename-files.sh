@@ -80,20 +80,20 @@ done <<< "$IMAGE_FILES"
 rm -rf "$TEMP_DIR"
 echo "File renaming complete!"
 
-# # Configure Git for potential commits
-# git config --global user.email "action@github.com"
-# git config --global user.name "GitHub Action"
+# Configure Git for potential commits
+git config --global user.email "action@github.com"
+git config --global user.name "GitHub Action"
 
-# # Check if we have any changes to commit
-# echo "Files were renamed, committing changes..."
-# git add -A
-# if [ -n "$(git status --porcelain)" ]; then
-#     echo "Changes detected, committing..."
-#     git commit -m "Rename files sequentially [skip ci]"
+# Check if we have any changes to commit
+echo "Files were renamed, committing changes..."
+git add -A
+if [ -n "$(git status --porcelain)" ]; then
+    echo "Changes detected, committing..."
+    git commit -m "Rename files sequentially [skip ci]"
     
-#     # Use the GITHUB_TOKEN for authentication
-#     git push "https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:${GITHUB_REF#refs/heads/}
-#     echo "Changes pushed successfully"
-# else
-#     echo "No changes to commit"
-# fi
+    # Use the GITHUB_TOKEN for authentication
+    git push "https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:${GITHUB_REF#refs/heads/}
+    echo "Changes pushed successfully"
+else
+    echo "No changes to commit"
+fi
