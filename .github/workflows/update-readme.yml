@@ -14,17 +14,34 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Cache APT packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt
+          key: ${{ runner.os }}-apt-imagemagick-${{ hashFiles('**/lockfiles') }} # More specific key
+          restore-keys: |
+            ${{ runner.os }}-apt-imagemagick-
+
       - name: Install ImageMagick
         run: |
           sudo apt-get update
           sudo apt-get install -y imagemagick
 
+      - name: Cache Thumbnails
+        uses: actions/cache@v4
+        id: cache-thumbnails # Give an ID to check cache hit
+        with:
+          path: .thumbnails
+          key: ${{ runner.os }}-thumbnails-${{ hashFiles('**/rename-files.sh', '**/*.[jp][pn]g', '**/*.[jJ][pP][eE][gG]', '**/*.[bB][mM][pP]') }} # Key based on images and rename script
+          restore-keys: |
+            ${{ runner.os }}-thumbnails-
+
       - name: Rename files sequentially
         run: |
           chmod +x .github/scripts/rename-files.sh
-          ./.github/scripts/rename-files.sh
+          bash .github/scripts/rename-files.sh # Use bash explicitly
 
       - name: Run update script
         run: |
           chmod +x .github/scripts/update-readme.sh
-          ./.github/scripts/update-readme.sh
+          bash .github/scripts/update-readme.sh # Use bash explicitly
