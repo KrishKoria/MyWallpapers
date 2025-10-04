@@ -4,6 +4,24 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "**.jpg"
+      - "**.jpeg"
+      - "**.png"
+      - "**.bmp"
+      - "**.JPG"
+      - "**.JPEG"
+      - "**.PNG"
+      - "**.BMP"
+      - ".github/scripts/*.sh"
+      - ".github/workflows/update-readme.yml"
+      - "README.md"
+
+# Prevent multiple workflow runs from executing simultaneously
+concurrency:
+  group: update-readme-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
@@ -13,35 +31,75 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history for proper git operations
 
       - name: Cache APT packages
         uses: actions/cache@v4
         with:
           path: /var/cache/apt
-          key: ${{ runner.os }}-apt-imagemagick-${{ hashFiles('**/lockfiles') }} # More specific key
+          key: ${{ runner.os }}-apt-imagemagick-v1
           restore-keys: |
             ${{ runner.os }}-apt-imagemagick-
 
       - name: Install ImageMagick
         run: |
-          sudo apt-get update
+          sudo apt-get update -qq
           sudo apt-get install -y imagemagick
+
+          # Verify installation
+          convert -version | head -n 1
+          echo "✓ ImageMagick installed successfully"
 
       - name: Cache Thumbnails
         uses: actions/cache@v4
-        id: cache-thumbnails # Give an ID to check cache hit
+        id: cache-thumbnails
         with:
           path: .thumbnails
-          key: ${{ runner.os }}-thumbnails-${{ hashFiles('**/rename-files.sh', '**/*.[jp][pn]g', '**/*.[jJ][pP][eE][gG]', '**/*.[bB][mM][pP]') }} # Key based on images and rename script
+          key: ${{ runner.os }}-thumbnails-${{ hashFiles('**/*.jpg', '**/*.jpeg', '**/*.png', '**/*.bmp', '**/*.JPG', '**/*.JPEG', '**/*.PNG', '**/*.BMP') }}
           restore-keys: |
             ${{ runner.os }}-thumbnails-
 
       - name: Rename files sequentially
+        id: rename
         run: |
           chmod +x .github/scripts/rename-files.sh
-          bash .github/scripts/rename-files.sh # Use bash explicitly
+          bash .github/scripts/rename-files.sh
+        continue-on-error: false
 
       - name: Run update script
+        id: update
         run: |
           chmod +x .github/scripts/update-readme.sh
-          bash .github/scripts/update-readme.sh # Use bash explicitly
+          bash .github/scripts/update-readme.sh
+        continue-on-error: false
+
+      - name: Generate job summary
+        if: always()
+        run: |
+          echo "## Workflow Summary 📊" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.rename.outcome }}" == "success" ]; then
+            echo "✅ File renaming completed successfully" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ File renaming failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ steps.update.outcome }}" == "success" ]; then
+            echo "✅ README update completed successfully" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ README update failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Cache Status" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.cache-thumbnails.outputs.cache-hit }}" == "true" ]; then
+            echo "✅ Thumbnail cache hit - reusing existing thumbnails" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "🔄 Thumbnail cache miss - regenerating thumbnails" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
