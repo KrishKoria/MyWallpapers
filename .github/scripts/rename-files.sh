@@ -14,9 +14,8 @@ done < <(find . -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -
   -not -path "./.github/*" \
   -print0)
 
-# Sort the array of found image files
-IFS=$'\n' sorted_image_files=($(sort <<<"${IMAGE_FILES_LIST[*]}"))
-unset IFS
+# Sort the array of found image files using mapfile
+mapfile -t sorted_image_files < <(printf '%s\n' "${IMAGE_FILES_LIST[@]}" | sort)
 
 TOTAL_FILES=${#sorted_image_files[@]}
 echo "✓ Found $TOTAL_FILES image files to process."
@@ -105,8 +104,15 @@ if [ "$ANY_FILE_RENAMED" = true ]; then
   if [ -n "$(git status --porcelain)" ]; then
     echo "✓ Changes detected by git, committing..."
     git commit -m "Rename files sequentially [skip ci]"
-    git push "https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:${GITHUB_REF#refs/heads/}
-    echo "✓ Changes pushed successfully"
+    
+    # Only push if running in GitHub Actions
+    if [ -n "${GITHUB_ACTOR:-}" ] && [ -n "${GITHUB_TOKEN:-}" ] && [ -n "${GITHUB_REPOSITORY:-}" ] && [ -n "${GITHUB_REF:-}" ]; then
+      echo "✓ Pushing changes..."
+      git push "https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:${GITHUB_REF#refs/heads/}
+      echo "✓ Changes pushed successfully"
+    else
+      echo "⚠ Not running in GitHub Actions, skipping push."
+    fi
   else
     echo "⚠ Git status clean after renaming, no commit needed."
   fi

@@ -26,9 +26,8 @@ done < <(find . -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -
             -not -path "./.github/*" \
             -print0)
 
-# Sort the array of found image files
-IFS=$'\n' SORTED_IMAGE_FILES=($(sort <<<"${IMAGE_FILES_ARRAY[*]}"))
-unset IFS
+# Sort the array of found image files using mapfile
+mapfile -t SORTED_IMAGE_FILES < <(printf '%s\n' "${IMAGE_FILES_ARRAY[@]}" | sort)
 
 TOTAL_FILES=${#SORTED_IMAGE_FILES[@]}
 echo "✓ Found $TOTAL_FILES image files to process."
@@ -45,8 +44,11 @@ else
   # Function to generate a single thumbnail (for parallel execution)
   generate_thumbnail() {
     local file_path=$1
-    local thumb_file_name=$(basename "$file_path")
-    local thumb_file_path="$THUMB_DIR/$thumb_file_name"
+    local thumb_file_name
+    local thumb_file_path
+    
+    thumb_file_name=$(basename "$file_path")
+    thumb_file_path="$THUMB_DIR/$thumb_file_name"
     
     # Create or update thumbnail if needed
     if [ ! -f "$thumb_file_path" ] || [ "$file_path" -nt "$thumb_file_path" ]; then
@@ -182,9 +184,15 @@ if [ "$readme_content_updated" = true ] || [ "$thumbnails_content_updated" = tru
   if [ -n "$(git status --porcelain)" ]; then
     echo "✓ Changes detected by Git, committing..."
     git commit -m "Update image thumbnails in README [skip ci]"
-    echo "✓ Pushing changes..."
-    git push "https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:${GITHUB_REF#refs/heads/}
-    echo "✓ Changes pushed successfully."
+    
+    # Only push if running in GitHub Actions
+    if [ -n "${GITHUB_ACTOR:-}" ] && [ -n "${GITHUB_TOKEN:-}" ] && [ -n "${GITHUB_REPOSITORY:-}" ] && [ -n "${GITHUB_REF:-}" ]; then
+      echo "✓ Pushing changes..."
+      git push "https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:${GITHUB_REF#refs/heads/}
+      echo "✓ Changes pushed successfully."
+    else
+      echo "⚠ Not running in GitHub Actions, skipping push."
+    fi
   else
     echo "⚠ No effective changes detected by Git to commit."
   fi

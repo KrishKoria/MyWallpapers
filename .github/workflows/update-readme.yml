@@ -34,14 +34,6 @@ jobs:
         with:
           fetch-depth: 0 # Full history for proper git operations
 
-      - name: Cache APT packages
-        uses: actions/cache@v4
-        with:
-          path: /var/cache/apt
-          key: ${{ runner.os }}-apt-imagemagick-v1
-          restore-keys: |
-            ${{ runner.os }}-apt-imagemagick-
-
       - name: Install ImageMagick
         run: |
           sudo apt-get update -qq
@@ -62,6 +54,8 @@ jobs:
 
       - name: Rename files sequentially
         id: rename
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           chmod +x .github/scripts/rename-files.sh
           bash .github/scripts/rename-files.sh
@@ -69,6 +63,8 @@ jobs:
 
       - name: Run update script
         id: update
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           chmod +x .github/scripts/update-readme.sh
           bash .github/scripts/update-readme.sh
