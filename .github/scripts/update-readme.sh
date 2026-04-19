@@ -15,6 +15,19 @@ echo "=== README Update Script Started ==="
 # Create thumbnails directory if it doesn't exist
 mkdir -p "$THUMB_DIR"
 
+calculate_file_hash() {
+  local file_path=$1
+
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$file_path" | awk '{print $1}'
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$file_path" | awk '{print $1}'
+  else
+    echo "Error: no SHA-256 hashing tool is available." >&2
+    return 1
+  fi
+}
+
 echo "=== Phase 1: Discovering image files ==="
 IMAGE_FILES_ARRAY=()
 while IFS= read -r -d $'\0' file; do
@@ -46,12 +59,21 @@ else
     local file_path=$1
     local thumb_file_name
     local thumb_file_path
+    local thumb_hash_path
+    local source_hash
+    local cached_hash=""
     
     thumb_file_name=$(basename "$file_path")
     thumb_file_path="$THUMB_DIR/$thumb_file_name"
+    thumb_hash_path="$THUMB_DIR/$thumb_file_name.sha256"
+    source_hash=$(calculate_file_hash "$file_path") || return 1
+
+    if [ -f "$thumb_hash_path" ]; then
+      cached_hash=$(cat "$thumb_hash_path")
+    fi
     
-    # Create or update thumbnail if needed
-    if [ ! -f "$thumb_file_path" ] || [ "$file_path" -nt "$thumb_file_path" ]; then
+    # Rebuild when the cached thumbnail doesn't match the current source content.
+    if [ ! -f "$thumb_file_path" ] || [ "$cached_hash" != "$source_hash" ]; then
       # Use optimized ImageMagick settings for better performance
       if ! convert "$file_path" \
         -auto-orient \
@@ -64,13 +86,18 @@ else
         echo "  ⚠ Warning: Failed to create thumbnail for $file_path, using original"
         cp "$file_path" "$thumb_file_path" 2>/dev/null || true
       fi
-      return 0  # Indicates thumbnail was updated
+
+      if [ -f "$thumb_file_path" ]; then
+        printf '%s' "$source_hash" > "$thumb_hash_path"
+        return 0  # Indicates thumbnail was updated
+      fi
     fi
     return 1  # Indicates no update needed
   }
   
   # Export function for parallel execution
   export -f generate_thumbnail
+  export -f calculate_file_hash
   export THUMB_DIR THUMB_SIZE THUMB_QUALITY
   
   # Process thumbnails with parallel jobs (up to 4 at a time)
